@@ -95,6 +95,40 @@ function WeatherBadge({ weather }) {
   )
 }
 
+// ── Spotify widget ────────────────────────────────────────────────────────────
+function SpotifyWidget() {
+  return (
+    <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 shadow-xl">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-base">🎵</span>
+        <h2 className="text-sm font-semibold text-slate-200">Música para el viaje</h2>
+        <span className="ml-auto text-[10px] text-slate-500 px-2 py-0.5 bg-slate-700 rounded-md">Spotify</span>
+      </div>
+      <iframe
+        src="https://open.spotify.com/embed/playlist/2T1er2FGjCe75CYLIsat8N?utm_source=generator&theme=0"
+        width="100%"
+        height="152"
+        frameBorder="0"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="Música para el viaje"
+        className="rounded-xl"
+      />
+      <a
+        href="https://open.spotify.com/playlist/2T1er2FGjCe75CYLIsat8N"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] text-white text-sm font-semibold transition-colors"
+      >
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.313c-.213.334-.666.44-1 .227-2.733-1.671-6.174-2.048-10.225-1.122-.39.089-.78-.155-.869-.546-.089-.39.155-.78.546-.869 4.433-1.013 8.233-.578 11.295 1.3.334.213.44.666.253 1.01zm1.474-3.268c-.267.42-.834.553-1.254.287-3.13-1.923-7.9-2.48-11.604-1.357-.48.147-.988-.121-1.135-.6-.147-.48.121-.988.6-1.135 4.23-1.284 9.49-.66 13.106 1.55.42.267.553.834.287 1.255zm.127-3.403c-3.754-2.23-9.95-2.435-13.534-1.347-.574.175-1.183-.15-1.358-.724-.175-.574.15-1.183.724-1.358 4.12-1.252 10.97-1.01 15.3 1.558.518.308.69.974.382 1.493-.308.518-.974.69-1.493.382l-.021-.004z"/>
+        </svg>
+        Abrir en Spotify
+      </a>
+    </div>
+  )
+}
+
 // ── TradingView Brent widget ──────────────────────────────────────────────────
 function TradingViewWidget() {
   const containerRef = useRef(null)
@@ -521,6 +555,9 @@ export default function App() {
             showChargePoints={showChargePoints}
           />
         </div>
+
+        {/* ── Spotify widget ── */}
+        <SpotifyWidget />
 
         {/* ── TradingView Brent widget ── */}
         <TradingViewWidget />
