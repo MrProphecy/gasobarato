@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import SearchInput from './components/SearchInput'
 import MapView from './components/MapView'
 import StationList from './components/StationList'
-import { fetchRoute, fetchStations } from './utils/api'
+import { fetchRoute, fetchStations, fetchWeather } from './utils/api'
 import { filterStationsByRoute, parsePriceES } from './utils/geo'
 
 // ── Fuel type definitions (Ministry API field names) ─────────────────────────
@@ -59,6 +59,83 @@ function LoadingBar({ stage }) {
   )
 }
 
+// ── Weather widget ────────────────────────────────────────────────────────────
+function WeatherBadge({ weather }) {
+  if (!weather) return null
+  const temp = Math.round(weather.main.temp)
+  const desc = weather.weather[0].description
+  const icon = weather.weather[0].icon
+  const city = weather.name
+  return (
+    <div className="flex items-center gap-2 mt-3 px-3 py-2 bg-slate-700/50 border border-slate-600/60 rounded-xl">
+      <img
+        src={`https://openweathermap.org/img/wn/${icon}@2x.png`}
+        alt={desc}
+        className="w-10 h-10 shrink-0"
+      />
+      <div className="min-w-0">
+        <p className="text-xs text-slate-400 truncate">{city} — {desc}</p>
+        <p className="text-lg font-bold text-white leading-tight">{temp}°C</p>
+      </div>
+    </div>
+  )
+}
+
+// ── TradingView Brent widget ──────────────────────────────────────────────────
+function TradingViewWidget() {
+  const containerRef = useRef(null)
+  const scriptAdded = useRef(false)
+
+  useEffect(() => {
+    if (scriptAdded.current || !containerRef.current) return
+    scriptAdded.current = true
+
+    const script = document.createElement('script')
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js'
+    script.type = 'text/javascript'
+    script.async = true
+    script.innerHTML = JSON.stringify({
+      symbol: 'TVC:UKOIL',
+      width: '100%',
+      height: 200,
+      locale: 'es',
+      dateRange: '1M',
+      colorTheme: 'dark',
+      isTransparent: true,
+      autosize: true,
+      largeChartUrl: '',
+    })
+    containerRef.current.appendChild(script)
+  }, [])
+
+  return (
+    <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 shadow-xl">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-base">🛢️</span>
+        <h2 className="text-sm font-semibold text-slate-200">Petróleo Brent · TVC:UKOIL</h2>
+        <span className="ml-auto text-[10px] text-slate-500 px-2 py-0.5 bg-slate-700 rounded-md">TradingView</span>
+      </div>
+      <div className="tradingview-widget-container" ref={containerRef}>
+        <div className="tradingview-widget-container__widget" />
+      </div>
+    </div>
+  )
+}
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+function Clock() {
+  const [time, setTime] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <span className="px-2 py-1 bg-slate-700 rounded-md font-mono text-xs tabular-nums text-slate-200">
+      {time.toLocaleTimeString('es-ES')}
+    </span>
+  )
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [origin, setOrigin]           = useState(null)
@@ -70,6 +147,8 @@ export default function App() {
   const [loadStage, setLoadStage]     = useState(0)
   const [error, setError]             = useState(null)
   const [selectedStation, setSelectedStation] = useState(null)
+  const [brandFilter, setBrandFilter] = useState('')
+  const [weather, setWeather]         = useState(null)
 
   const handleSearch = useCallback(async () => {
     if (!origin || !destination) return
@@ -78,6 +157,8 @@ export default function App() {
     setStations([])
     setRoute(null)
     setSelectedStation(null)
+    setBrandFilter('')
+    setWeather(null)
 
     try {
       // Stage 0 – route
@@ -94,6 +175,9 @@ export default function App() {
       await new Promise(r => setTimeout(r, 0)) // yield to UI
       const nearby = filterStationsByRoute(allStations, routeData.coordinates, 5)
       setStations(nearby)
+
+      // Weather for origin (non-blocking)
+      fetchWeather(origin.lat, origin.lng).then(setWeather).catch(() => {})
     } catch (err) {
       setError(err.message || 'Error desconocido')
     } finally {
@@ -101,10 +185,19 @@ export default function App() {
     }
   }, [origin, destination])
 
-  // Sort stations by selected fuel price (ascending), drop unprice ones
-  const sortedStations = stations
-    .filter(s => parsePriceES(s[fuelType.key]) > 0)
-    .sort((a, b) => parsePriceES(a[fuelType.key]) - parsePriceES(b[fuelType.key]))
+  // All brands from route-filtered stations (before brand filter)
+  const brands = useMemo(() => {
+    const set = new Set(stations.map(s => s['Rótulo']?.trim()).filter(Boolean))
+    return [...set].sort()
+  }, [stations])
+
+  // Sort stations by selected fuel price (ascending), apply brand filter
+  const sortedStations = useMemo(() =>
+    stations
+      .filter(s => parsePriceES(s[fuelType.key]) > 0)
+      .filter(s => !brandFilter || s['Rótulo']?.trim() === brandFilter)
+      .sort((a, b) => parsePriceES(a[fuelType.key]) - parsePriceES(b[fuelType.key])),
+  [stations, fuelType, brandFilter])
 
   const canSearch = origin && destination && !loading
 
@@ -124,6 +217,7 @@ export default function App() {
             <span className="hidden sm:inline">Datos:</span>
             <span className="px-2 py-1 bg-slate-700 rounded-md">MINETUR</span>
             <span className="px-2 py-1 bg-slate-700 rounded-md">OSM</span>
+            <Clock />
           </div>
         </div>
       </header>
@@ -132,12 +226,16 @@ export default function App() {
         {/* ── Search panel ── */}
         <section className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 shadow-xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <SearchInput
-              label="Origen"
-              icon={<FromIcon />}
-              placeholder="Ciudad o dirección de salida…"
-              onSelect={setOrigin}
-            />
+            <div>
+              <SearchInput
+                label="Origen"
+                icon={<FromIcon />}
+                placeholder="Ciudad o dirección de salida…"
+                onSelect={setOrigin}
+              />
+              {/* Weather badge appears below origin */}
+              <WeatherBadge weather={weather} />
+            </div>
             <SearchInput
               label="Destino"
               icon={<ToIcon />}
@@ -220,6 +318,9 @@ export default function App() {
             route={route}
             selectedStation={selectedStation}
             onSelectStation={setSelectedStation}
+            brands={brands}
+            brandFilter={brandFilter}
+            onBrandFilter={setBrandFilter}
           />
 
           {/* Map */}
@@ -233,11 +334,14 @@ export default function App() {
             onSelectStation={setSelectedStation}
           />
         </div>
+
+        {/* ── TradingView Brent widget ── */}
+        <TradingViewWidget />
       </main>
 
       {/* Footer */}
       <footer className="border-t border-slate-800 py-3 text-center text-xs text-slate-600">
-        Precios actualizados por el Ministerio de Industria · Rutas por OpenRouteService · Mapas OpenStreetMap / CARTO
+        Precios actualizados por el Ministerio de Industria · Rutas por OpenRouteService · Mapas OpenStreetMap / CARTO · Clima OpenWeatherMap
       </footer>
     </div>
   )

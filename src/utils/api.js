@@ -1,3 +1,5 @@
+const OWM_API_KEY = 'b39e50c314b2702f6ca59b925b212134'
+
 const ORS_API_KEY =
   'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjBkNTkyMTVkNTYzYzQ1NzRhMmYxMDVkMWM5N2M3MWE4IiwiaCI6Im11cm11cjY0In0='
 
@@ -57,6 +59,19 @@ export async function fetchRoute(origin, destination) {
   const { distance, duration } = feature.properties.summary
 
   return { coordinates, distance, duration }
+}
+
+// ── OpenWeatherMap – current weather ────────────────────────────────────────
+export async function fetchWeather(lat, lon) {
+  const params = new URLSearchParams({
+    lat, lon,
+    appid: OWM_API_KEY,
+    units: 'metric',
+    lang: 'es',
+  })
+  const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params}`)
+  if (!res.ok) throw new Error(`OWM ${res.status}`)
+  return res.json()
 }
 
 // ── Ministerio API – all stations ───────────────────────────────────────────

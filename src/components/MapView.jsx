@@ -14,7 +14,32 @@ L.Icon.Default.mergeOptions({
 })
 
 // ── Price pin icon ────────────────────────────────────────────────────────────
-function makePriceIcon(price, rank) {
+function makePriceIcon(price, rank, isSelected = false) {
+  if (isSelected) {
+    return L.divIcon({
+      className: '',
+      html: `<div style="position:relative;display:inline-block;">
+        <div style="position:absolute;inset:-8px;border-radius:50%;border:3px solid #3b82f6;opacity:0.6;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;pointer-events:none"></div>
+        <div style="
+          background:#1d4ed8;
+          color:white;
+          border:3px solid #93c5fd;
+          border-radius:50%;
+          width:46px;height:46px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:9.5px;font-weight:700;
+          box-shadow:0 3px 14px rgba(59,130,246,0.7);
+          position:relative;
+          font-family:monospace;
+          letter-spacing:-0.5px;
+        ">${price.toFixed(3)}</div>
+      </div>`,
+      iconSize: [46, 46],
+      iconAnchor: [23, 23],
+      popupAnchor: [0, -26],
+    })
+  }
+
   const bg =
     rank === 0 ? '#10b981'   // emerald – cheapest
     : rank === 1 ? '#f59e0b' // amber
@@ -189,7 +214,7 @@ export default function MapView({
             <Marker
               key={`${station._lat}-${station._lon}-${idx}`}
               position={[station._lat, station._lon]}
-              icon={makePriceIcon(price, idx)}
+              icon={makePriceIcon(price, idx, isSelected)}
               zIndexOffset={isSelected ? 1000 : stations.length - idx}
               eventHandlers={{
                 click: () => onSelectStation(isSelected ? null : station),

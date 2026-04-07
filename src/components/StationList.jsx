@@ -59,7 +59,42 @@ function PriceBadge({ price, rank }) {
   )
 }
 
-export default function StationList({ stations, fuelType, route, selectedStation, onSelectStation }) {
+function NavButtons({ lat, lon }) {
+  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`
+  const wazeUrl = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`
+  return (
+    <div className="ml-8 mt-1.5 flex gap-1.5">
+      <a
+        href={gmapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-600/20 border border-blue-500/30
+          text-blue-300 text-[10px] font-semibold hover:bg-blue-600/40 transition-colors"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+        Google Maps
+      </a>
+      <a
+        href={wazeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-600/20 border border-cyan-500/30
+          text-cyan-300 text-[10px] font-semibold hover:bg-cyan-600/40 transition-colors"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.54 6.63C19.6 4.37 17.86 2.55 15.65 1.5A10.44 10.44 0 004.34 3.17 10.44 10.44 0 001.5 15.65a10.44 10.44 0 008.29 7.85h.08a10.47 10.47 0 004.35-.37 10.42 10.42 0 006.71-6.71 10.44 10.44 0 00-.39-9.79zm-8.54 13c-4.69 0-8.5-3.81-8.5-8.5S7.31 2.63 12 2.63s8.5 3.81 8.5 8.5-3.81 8.5-8.5 8.5z"/>
+        </svg>
+        Waze
+      </a>
+    </div>
+  )
+}
+
+export default function StationList({ stations, fuelType, route, selectedStation, onSelectStation, brands, brandFilter, onBrandFilter }) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-full">
       {/* Header */}
@@ -75,6 +110,23 @@ export default function StationList({ stations, fuelType, route, selectedStation
           <p className="text-xs text-slate-400 mt-0.5">
             Ordenadas por precio · {fuelType.label} · ≤ 5 km de la ruta
           </p>
+        )}
+
+        {/* Brand filter */}
+        {brands.length > 0 && (
+          <div className="mt-2">
+            <select
+              value={brandFilter}
+              onChange={(e) => onBrandFilter(e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-sm
+                text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="">Todas las marcas ({brands.length})</option>
+              {brands.map(b => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
@@ -101,7 +153,7 @@ export default function StationList({ stations, fuelType, route, selectedStation
                 onClick={() => onSelectStation(isSelected ? null : station)}
                 className={`w-full text-left px-3.5 py-3 border-b border-slate-700/70
                   hover:bg-slate-700/60 transition-colors group
-                  ${isSelected ? 'bg-slate-700/80 border-l-[3px] border-l-emerald-500 pl-[13px]' : ''}`}
+                  ${isSelected ? 'bg-blue-900/30 border-l-[3px] border-l-blue-500 pl-[13px]' : ''}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   {/* Rank + info */}
@@ -111,7 +163,8 @@ export default function StationList({ stations, fuelType, route, selectedStation
                       {idx < 3 ? MEDAL[idx] : idx + 1}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-100 text-sm truncate group-hover:text-white">
+                      <p className={`font-semibold text-sm truncate group-hover:text-white
+                        ${isSelected ? 'text-blue-200' : 'text-slate-100'}`}>
                         {label}
                       </p>
                       <p className="text-xs text-slate-400 truncate">{locality}</p>
@@ -132,6 +185,9 @@ export default function StationList({ stations, fuelType, route, selectedStation
                     <span className="mr-1">🕐</span>{station['Horario']}
                   </p>
                 )}
+
+                {/* Navigation buttons */}
+                <NavButtons lat={station._lat} lon={station._lon} />
               </button>
             )
           })

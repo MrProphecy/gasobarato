@@ -3,7 +3,9 @@
     "allow": [
       "Bash(dir C:\\\\Projects\\\\gasolineras-esp:*)",
       "Bash(npm install:*)",
-      "Bash(cmd:*)"
+      "Bash(cmd:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
