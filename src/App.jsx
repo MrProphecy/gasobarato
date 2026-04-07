@@ -2,8 +2,22 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import SearchInput from './components/SearchInput'
 import MapView from './components/MapView'
 import StationList from './components/StationList'
-import { fetchRoute, fetchStations, fetchWeather, fetchRadares, fetchTCA } from './utils/api'
+import { fetchRoute, fetchStations, fetchWeather, fetchRadares, fetchTCA, fetchChargePoints } from './utils/api'
 import { filterStationsByRoute, parsePriceES, distanceToRouteKm } from './utils/geo'
+
+// ── Vehicle types ─────────────────────────────────────────────────────────────
+const VEHICLE_TYPES = [
+  { id: 'moto_s',   label: 'Moto pequeña',   consumption: 3.5 },
+  { id: 'moto_l',   label: 'Moto grande',     consumption: 5.5 },
+  { id: 'urban',    label: 'Urbano/Pequeño',  consumption: 6.0 },
+  { id: 'turismo',  label: 'Turismo Mixto',   consumption: 7.0 },
+  { id: 'suv',      label: 'SUV/Crossover',   consumption: 9.0 },
+  { id: 'van',      label: 'Furgoneta/MPV',   consumption: 11.0 },
+  { id: 'truck_l',  label: 'Camión ligero',   consumption: 15.0 },
+  { id: 'truck_h',  label: 'Camión pesado',   consumption: 28.0 },
+  { id: 'hybrid',   label: 'Híbrido',         consumption: 4.0 },
+  { id: 'electric', label: '⚡ Eléctrico',    consumption: 0 },
+]
 
 // ── Fuel type definitions (Ministry API field names) ─────────────────────────
 const FUEL_TYPES = [
@@ -171,6 +185,19 @@ export default function App() {
   const [radaresLoading, setRadaresLoading] = useState(false)
   const [showRadares, setShowRadares] = useState(true)
   const [tcaSites, setTcaSites]       = useState([])
+  const [vehicleType, setVehicleType] = useState(VEHICLE_TYPES[3]) // Turismo Mixto
+  const [consumption, setConsumption] = useState(7.0)
+  const [chargePoints, setChargePoints]     = useState([])
+  const [showChargePoints, setShowChargePoints] = useState(false)
+  const [chargeLoading, setChargeLoading]   = useState(false)
+
+  const handleVehicleChange = useCallback((id) => {
+    const v = VEHICLE_TYPES.find(vt => vt.id === id)
+    if (!v) return
+    setVehicleType(v)
+    setConsumption(v.consumption)
+    if (v.id === 'electric') setShowChargePoints(true)
+  }, [])
 
   const handleSearch = useCallback(async () => {
     if (!origin || !destination) return
@@ -183,6 +210,7 @@ export default function App() {
     setWeather(null)
     setRadares([])
     setTcaSites([])
+    setChargePoints([])
 
     try {
       // Stage 0 – route
@@ -199,6 +227,30 @@ export default function App() {
         })
         .catch(() => {})
         .finally(() => setRadaresLoading(false))
+
+      // Charge points (non-blocking, parallel)
+      setChargeLoading(true)
+      {
+        let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity
+        for (const [lat, lon] of routeData.coordinates) {
+          if (lat < minLat) minLat = lat
+          if (lat > maxLat) maxLat = lat
+          if (lon < minLon) minLon = lon
+          if (lon > maxLon) maxLon = lon
+        }
+        fetchChargePoints({ minLat, maxLat, minLon, maxLon })
+          .then(points => {
+            const near = (Array.isArray(points) ? points : []).filter(p => {
+              const lat = p.AddressInfo?.Latitude
+              const lon = p.AddressInfo?.Longitude
+              if (lat == null || lon == null) return false
+              return distanceToRouteKm(lat, lon, routeData.coordinates) <= 5
+            })
+            setChargePoints(near)
+          })
+          .catch(() => {})
+          .finally(() => setChargeLoading(false))
+      }
 
       // TCA silently
       fetchTCA()
@@ -262,7 +314,7 @@ export default function App() {
               rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-xl font-semibold transition-colors text-xs"
             >
-              ☕ Ko-fi
+              ☕ Invítame un Café
             </a>
             <span className="hidden sm:inline">Datos:</span>
             <span className="px-2 py-1 bg-slate-700 rounded-md">MINETUR</span>
@@ -314,6 +366,32 @@ export default function App() {
             ))}
           </div>
 
+          {/* Vehicle type + consumption */}
+          <div className="flex gap-2 mb-3">
+            <select
+              value={vehicleType.id}
+              onChange={(e) => handleVehicleChange(e.target.value)}
+              className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-200
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 cursor-pointer"
+            >
+              {VEHICLE_TYPES.map(v => (
+                <option key={v.id} value={v.id}>{v.label}</option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1.5 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2">
+              <input
+                type="number"
+                min="0"
+                max="60"
+                step="0.1"
+                value={consumption}
+                onChange={(e) => setConsumption(Math.max(0, parseFloat(e.target.value) || 0))}
+                className="w-14 bg-transparent text-slate-200 text-sm text-right focus:outline-none"
+              />
+              <span className="text-slate-400 text-xs shrink-0">L/100km</span>
+            </div>
+          </div>
+
           {/* Search button */}
           <button
             type="button"
@@ -347,29 +425,56 @@ export default function App() {
           {/* Progress */}
           {loading && <LoadingBar stage={loadStage} />}
 
-          {/* Radar toggle – visible while loading or after route found */}
-          {(radaresLoading || (route && radares.length > 0)) && (
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/60">
+          {/* Layer toggles – visible after search */}
+          {(radaresLoading || chargeLoading || (route && (radares.length > 0 || chargePoints.length > 0))) && (
+            <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-700/60">
               <span className="text-xs text-slate-500">Capas:</span>
-              <button
-                type="button"
-                onClick={() => setShowRadares(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
-                  showRadares
-                    ? 'bg-red-900/40 border-red-700/70 text-red-300 hover:bg-red-900/60'
-                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
-                }`}
-              >
-                📷 Radares DGT
-                {radaresLoading ? (
-                  <svg className="w-3 h-3 animate-spin ml-1" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <span className="text-slate-500">({radares.length})</span>
-                )}
-              </button>
+
+              {/* Radar toggle */}
+              {(radaresLoading || radares.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setShowRadares(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
+                    showRadares
+                      ? 'bg-red-900/40 border-red-700/70 text-red-300 hover:bg-red-900/60'
+                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                  }`}
+                >
+                  📷 Radares DGT
+                  {radaresLoading ? (
+                    <svg className="w-3 h-3 animate-spin ml-1" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <span className="text-slate-500">({radares.length})</span>
+                  )}
+                </button>
+              )}
+
+              {/* Charge points toggle */}
+              {(chargeLoading || chargePoints.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setShowChargePoints(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
+                    showChargePoints
+                      ? 'bg-green-900/40 border-green-700/70 text-green-300 hover:bg-green-900/60'
+                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                  }`}
+                >
+                  ⚡ Recarga eléctrica
+                  {chargeLoading ? (
+                    <svg className="w-3 h-3 animate-spin ml-1" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <span className="text-slate-500">({chargePoints.length})</span>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
@@ -397,6 +502,7 @@ export default function App() {
             brands={brands}
             brandFilter={brandFilter}
             onBrandFilter={setBrandFilter}
+            consumption={consumption}
           />
 
           {/* Map */}
@@ -411,6 +517,8 @@ export default function App() {
             radares={radares}
             showRadares={showRadares}
             tcaSites={tcaSites}
+            chargePoints={chargePoints}
+            showChargePoints={showChargePoints}
           />
         </div>
 

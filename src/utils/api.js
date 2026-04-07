@@ -154,6 +154,26 @@ export async function fetchTCA() {
   }
 }
 
+// ── OpenChargeMap – electric charge points ───────────────────────────────────
+const OCM_API_KEY = 'da645299-cfa9-4f7b-9ab5-e0253d0d3251'
+
+export async function fetchChargePoints({ minLat, maxLat, minLon, maxLon }) {
+  try {
+    const params = new URLSearchParams({
+      key: OCM_API_KEY,
+      boundingbox: `(${maxLat},${minLon}),(${minLat},${maxLon})`,
+      maxresults: '100',
+      compact: 'true',
+      verbose: 'false',
+    })
+    const res = await fetch(`https://api.openchargemap.io/v3/poi/?${params}`)
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
 // ── Ministerio API – all stations ───────────────────────────────────────────
 export async function fetchStations() {
   const res = await fetch(MINETUR_URL, {

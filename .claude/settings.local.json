@@ -6,7 +6,8 @@
       "Bash(cmd:*)",
       "Bash(npm run:*)",
       "Bash(npx vite:*)",
-      "Bash(cmd.exe:*)"
+      "Bash(cmd.exe:*)",
+      "Bash(node node_modules/.bin/vite build)"
     ]
   }
 }

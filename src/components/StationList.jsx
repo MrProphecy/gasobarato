@@ -94,7 +94,29 @@ function NavButtons({ lat, lon }) {
   )
 }
 
-export default function StationList({ stations, fuelType, route, selectedStation, onSelectStation, brands, brandFilter, onBrandFilter }) {
+function CostBadge({ price, routeDistKm, consumption, maxPrice }) {
+  if (!routeDistKm || routeDistKm === 0) return null
+  if (consumption === 0) {
+    return (
+      <span className="text-[10px] text-emerald-400 font-semibold">
+        ⚡ 0.00€ — ¡Viaje gratis!
+      </span>
+    )
+  }
+  const cost = routeDistKm * consumption / 100 * price
+  const maxCost = routeDistKm * consumption / 100 * maxPrice
+  const savings = maxCost - cost
+  return (
+    <span className="text-[10px] text-slate-400">
+      <span className="text-amber-400 font-bold">{cost.toFixed(2)}€</span>
+      {savings > 0.01 && (
+        <span className="text-emerald-400 ml-1">↓{savings.toFixed(2)}€</span>
+      )}
+    </span>
+  )
+}
+
+export default function StationList({ stations, fuelType, route, selectedStation, onSelectStation, brands, brandFilter, onBrandFilter, consumption }) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-full">
       {/* Header */}
@@ -136,8 +158,12 @@ export default function StationList({ stations, fuelType, route, selectedStation
       <div className="overflow-y-auto flex-1" style={{ maxHeight: '560px' }}>
         {stations.length === 0 ? (
           <EmptyState hasRoute={!!route} />
-        ) : (
-          stations.map((station, idx) => {
+        ) : (() => {
+          const routeDistKm = route ? route.distance / 1000 : 0
+          const maxPrice = stations.length > 0
+            ? parsePriceES(stations[stations.length - 1][fuelType.key])
+            : 0
+          return stations.map((station, idx) => {
             const price = parsePriceES(station[fuelType.key])
             const isSelected = selectedStation?._lat === station._lat && selectedStation?._lon === station._lon
             const label = station['Rótulo']?.trim() || 'Estación sin nombre'
@@ -176,6 +202,16 @@ export default function StationList({ stations, fuelType, route, selectedStation
                   <div className="shrink-0 text-right">
                     <PriceBadge price={price} rank={idx} />
                     <p className="text-xs text-slate-500 mt-1">{station._distKm.toFixed(1)} km</p>
+                    {routeDistKm > 0 && (
+                      <div className="mt-0.5">
+                        <CostBadge
+                          price={price}
+                          routeDistKm={routeDistKm}
+                          consumption={consumption ?? 7}
+                          maxPrice={maxPrice}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -191,7 +227,7 @@ export default function StationList({ stations, fuelType, route, selectedStation
               </button>
             )
           })
-        )}
+        })()}
       </div>
     </div>
   )

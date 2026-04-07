@@ -13,6 +13,25 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+// ── Charge point icon ─────────────────────────────────────────────────────────
+const chargeIcon = L.divIcon({
+  className: '',
+  html: `<div style="
+    background:#16a34a;
+    color:white;
+    border:2px solid #4ade80;
+    border-radius:6px;
+    width:28px;height:28px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    box-shadow:0 2px 8px rgba(22,163,74,0.6);
+    cursor:pointer;
+  ">⚡</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -16],
+})
+
 // ── Radar icon ────────────────────────────────────────────────────────────────
 const radarIcon = L.divIcon({
   className: '',
@@ -167,6 +186,34 @@ function StationPopup({ station, fuelType }) {
   )
 }
 
+// ── Charge point popup ────────────────────────────────────────────────────────
+function ChargePopup({ point }) {
+  const info = point.AddressInfo || {}
+  const name = info.Title || 'Punto de recarga'
+  const address = [info.AddressLine1, info.Town].filter(Boolean).join(', ')
+  const connections = point.Connections || []
+  return (
+    <div className="min-w-[190px]">
+      <p className="font-bold text-green-400 text-sm leading-tight">⚡ {name}</p>
+      {address && <p className="text-slate-300 text-xs mt-1">{address}</p>}
+      {connections.length > 0 && (
+        <div className="mt-1.5 space-y-0.5">
+          {connections.slice(0, 4).map((c, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs">
+              {c.ConnectionType?.Title && (
+                <span className="text-slate-400 truncate">{c.ConnectionType.Title}</span>
+              )}
+              {c.PowerKW && (
+                <span className="text-green-400 font-bold shrink-0">{c.PowerKW} kW</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Radar popup content ───────────────────────────────────────────────────────
 function RadarPopup({ radar }) {
   return (
@@ -193,7 +240,7 @@ const SPAIN_CENTER = [40.4, -3.7]
 
 export default function MapView({
   origin, destination, route, stations, fuelType, selectedStation, onSelectStation,
-  radares, showRadares, tcaSites,
+  radares, showRadares, tcaSites, chargePoints, showChargePoints,
 }) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden" style={{ height: 620 }}>
@@ -267,6 +314,25 @@ export default function MapView({
             </Popup>
           </Marker>
         ))}
+
+        {/* Charge point markers */}
+        {showChargePoints && chargePoints?.map((point, idx) => {
+          const lat = point.AddressInfo?.Latitude
+          const lon = point.AddressInfo?.Longitude
+          if (!lat || !lon) return null
+          return (
+            <Marker
+              key={`charge-${idx}`}
+              position={[lat, lon]}
+              icon={chargeIcon}
+              zIndexOffset={400}
+            >
+              <Popup>
+                <ChargePopup point={point} />
+              </Popup>
+            </Marker>
+          )
+        })}
 
         {/* Station markers */}
         {stations.map((station, idx) => {
