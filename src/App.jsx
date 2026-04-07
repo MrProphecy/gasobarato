@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import SearchInput from './components/SearchInput'
 import MapView from './components/MapView'
 import StationList from './components/StationList'
-import { fetchRoute, fetchStations, fetchWeather } from './utils/api'
-import { filterStationsByRoute, parsePriceES } from './utils/geo'
+import { fetchRoute, fetchStations, fetchWeather, fetchRadares, fetchTCA } from './utils/api'
+import { filterStationsByRoute, parsePriceES, distanceToRouteKm } from './utils/geo'
 
 // ── Fuel type definitions (Ministry API field names) ─────────────────────────
 const FUEL_TYPES = [
@@ -122,6 +122,24 @@ function TradingViewWidget() {
   )
 }
 
+// ── Visit counter ─────────────────────────────────────────────────────────────
+function VisitCounter() {
+  const [count, setCount] = useState(null)
+  useEffect(() => {
+    fetch('https://api.counterapi.dev/v1/gasobarato/visits/up')
+      .then(r => r.json())
+      .then(d => setCount(d.count ?? d.value ?? null))
+      .catch(() => {})
+  }, [])
+  if (count === null) return null
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span>👁</span>
+      <span>{count.toLocaleString('es-ES')}</span>
+    </span>
+  )
+}
+
 // ── Clock ─────────────────────────────────────────────────────────────────────
 function Clock() {
   const [time, setTime] = useState(() => new Date())
@@ -149,6 +167,10 @@ export default function App() {
   const [selectedStation, setSelectedStation] = useState(null)
   const [brandFilter, setBrandFilter] = useState('')
   const [weather, setWeather]         = useState(null)
+  const [radares, setRadares]         = useState([])
+  const [radaresLoading, setRadaresLoading] = useState(false)
+  const [showRadares, setShowRadares] = useState(true)
+  const [tcaSites, setTcaSites]       = useState([])
 
   const handleSearch = useCallback(async () => {
     if (!origin || !destination) return
@@ -159,12 +181,32 @@ export default function App() {
     setSelectedStation(null)
     setBrandFilter('')
     setWeather(null)
+    setRadares([])
+    setTcaSites([])
 
     try {
       // Stage 0 – route
       setLoadStage(0)
       const routeData = await fetchRoute(origin, destination)
       setRoute(routeData)
+
+      // Radares DGT (non-blocking, parallel)
+      setRadaresLoading(true)
+      fetchRadares()
+        .then(all => {
+          const near = all.filter(r => distanceToRouteKm(r.lat, r.lon, routeData.coordinates) <= 3)
+          setRadares(near)
+        })
+        .catch(() => {})
+        .finally(() => setRadaresLoading(false))
+
+      // TCA silently
+      fetchTCA()
+        .then(all => {
+          const near = all.filter(s => distanceToRouteKm(s.lat, s.lon, routeData.coordinates) <= 3)
+          setTcaSites(near)
+        })
+        .catch(() => {})
 
       // Stage 1 – stations
       setLoadStage(1)
@@ -214,6 +256,14 @@ export default function App() {
             <p className="text-[11px] text-slate-500 leading-none mt-0.5">Gasolineras baratas en tu ruta · España</p>
           </div>
           <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <a
+              href="https://ko-fi.com/pedroruiz7313"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-xl font-semibold transition-colors text-xs"
+            >
+              ☕ Ko-fi
+            </a>
             <span className="hidden sm:inline">Datos:</span>
             <span className="px-2 py-1 bg-slate-700 rounded-md">MINETUR</span>
             <span className="px-2 py-1 bg-slate-700 rounded-md">OSM</span>
@@ -297,6 +347,32 @@ export default function App() {
           {/* Progress */}
           {loading && <LoadingBar stage={loadStage} />}
 
+          {/* Radar toggle – visible while loading or after route found */}
+          {(radaresLoading || (route && radares.length > 0)) && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/60">
+              <span className="text-xs text-slate-500">Capas:</span>
+              <button
+                type="button"
+                onClick={() => setShowRadares(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
+                  showRadares
+                    ? 'bg-red-900/40 border-red-700/70 text-red-300 hover:bg-red-900/60'
+                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                📷 Radares DGT
+                {radaresLoading ? (
+                  <svg className="w-3 h-3 animate-spin ml-1" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <span className="text-slate-500">({radares.length})</span>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="mt-3 flex items-start gap-2.5 p-3 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-sm">
@@ -332,6 +408,9 @@ export default function App() {
             fuelType={fuelType}
             selectedStation={selectedStation}
             onSelectStation={setSelectedStation}
+            radares={radares}
+            showRadares={showRadares}
+            tcaSites={tcaSites}
           />
         </div>
 
@@ -340,8 +419,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-3 text-center text-xs text-slate-600">
-        Precios actualizados por el Ministerio de Industria · Rutas por OpenRouteService · Mapas OpenStreetMap / CARTO · Clima OpenWeatherMap
+      <footer className="border-t border-slate-800 py-3 text-center text-xs text-slate-600 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 px-4">
+        <span>Precios: Ministerio de Industria · Rutas: OpenRouteService · Mapas: OSM/CARTO · Clima: OpenWeatherMap</span>
+        <span className="text-slate-700">·</span>
+        <VisitCounter />
       </footer>
     </div>
   )

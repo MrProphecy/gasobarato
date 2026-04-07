@@ -1,5 +1,9 @@
 const OWM_API_KEY = 'b39e50c314b2702f6ca59b925b212134'
 
+const CORS_PROXY = 'https://api.allorigins.win/raw?url='
+const DGT_RADARES_URL = 'http://infocar.dgt.es/datex2/dgt/PredefinedLocationsPublication/radares/content.xml'
+const DGT_TCA_URL = 'http://infocar.dgt.es/datex2/dgt/MeasurementSitePublication/aforos/content.xml'
+
 const ORS_API_KEY =
   'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjBkNTkyMTVkNTYzYzQ1NzRhMmYxMDVkMWM5N2M3MWE4IiwiaCI6Im11cm11cjY0In0='
 
@@ -72,6 +76,82 @@ export async function fetchWeather(lat, lon) {
   const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params}`)
   if (!res.ok) throw new Error(`OWM ${res.status}`)
   return res.json()
+}
+
+// ── DGT Radares fijos ────────────────────────────────────────────────────────
+function parseRadaresXML(text) {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(text, 'application/xml')
+  if (doc.querySelector('parsererror')) return []
+
+  const radares = []
+  const locations = doc.querySelectorAll('predefinedLocation')
+
+  for (const loc of locations) {
+    const latEl = loc.querySelector('latitude')
+    const lonEl = loc.querySelector('longitude')
+    if (!latEl || !lonEl) continue
+
+    const lat = parseFloat(latEl.textContent)
+    const lon = parseFloat(lonEl.textContent)
+    if (isNaN(lat) || isNaN(lon)) continue
+
+    const nameEl = loc.querySelector('value')
+    const name = nameEl?.textContent?.trim() || ''
+
+    const speedMatch = name.match(/(\d+)\s*km\/h/i)
+    const speed = speedMatch ? parseInt(speedMatch[1]) : null
+
+    const roadMatch = name.match(/^([A-Za-z][\w-]*(?:-\d+)?)/i)
+    const road = roadMatch ? roadMatch[1].toUpperCase() : ''
+
+    const dirMatch = name.match(/(?:SENTIDO|HACIA|SALIDA)\s+([^0-9]+?)(?:\s+\d|$)/i)
+    const direction = dirMatch ? dirMatch[1].trim() : ''
+
+    radares.push({ lat, lon, name, road, speed, direction })
+  }
+
+  return radares
+}
+
+export async function fetchRadares() {
+  try {
+    const res = await fetch(CORS_PROXY + encodeURIComponent(DGT_RADARES_URL))
+    if (!res.ok) return []
+    const text = await res.text()
+    return parseRadaresXML(text)
+  } catch {
+    return []
+  }
+}
+
+// ── DGT TCA / aforos (tramos peligrosos) ─────────────────────────────────────
+function parseTCAXML(text) {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(text, 'application/xml')
+  if (doc.querySelector('parsererror')) return []
+
+  const sites = []
+  for (const site of doc.querySelectorAll('measurementSite')) {
+    const latEl = site.querySelector('latitude')
+    const lonEl = site.querySelector('longitude')
+    if (!latEl || !lonEl) continue
+    const lat = parseFloat(latEl.textContent)
+    const lon = parseFloat(lonEl.textContent)
+    if (!isNaN(lat) && !isNaN(lon)) sites.push({ lat, lon })
+  }
+  return sites
+}
+
+export async function fetchTCA() {
+  try {
+    const res = await fetch(CORS_PROXY + encodeURIComponent(DGT_TCA_URL))
+    if (!res.ok) return []
+    const text = await res.text()
+    return parseTCAXML(text)
+  } catch {
+    return []
+  }
 }
 
 // ── Ministerio API – all stations ───────────────────────────────────────────

@@ -13,6 +13,25 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+// ── Radar icon ────────────────────────────────────────────────────────────────
+const radarIcon = L.divIcon({
+  className: '',
+  html: `<div style="
+    background:#dc2626;
+    color:white;
+    border:2px solid #fca5a5;
+    border-radius:6px;
+    width:28px;height:28px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    box-shadow:0 2px 8px rgba(220,38,38,0.6);
+    cursor:pointer;
+  ">📷</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -16],
+})
+
 // ── Price pin icon ────────────────────────────────────────────────────────────
 function makePriceIcon(price, rank, isSelected = false) {
   if (isSelected) {
@@ -148,11 +167,33 @@ function StationPopup({ station, fuelType }) {
   )
 }
 
+// ── Radar popup content ───────────────────────────────────────────────────────
+function RadarPopup({ radar }) {
+  return (
+    <div className="min-w-[160px]">
+      <p className="font-bold text-red-400 text-sm leading-tight">📷 Radar fijo DGT</p>
+      {radar.road && <p className="text-slate-300 text-xs mt-1 font-semibold">{radar.road}</p>}
+      {radar.speed && (
+        <p className="text-slate-200 text-xs mt-0.5">
+          <span className="text-red-300 font-bold">{radar.speed} km/h</span> velocidad máx.
+        </p>
+      )}
+      {radar.direction && (
+        <p className="text-slate-400 text-xs mt-0.5">➡ {radar.direction}</p>
+      )}
+      {!radar.road && !radar.speed && (
+        <p className="text-slate-400 text-xs mt-0.5 break-words max-w-[200px]">{radar.name}</p>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 const SPAIN_CENTER = [40.4, -3.7]
 
 export default function MapView({
   origin, destination, route, stations, fuelType, selectedStation, onSelectStation,
+  radares, showRadares, tcaSites,
 }) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden" style={{ height: 620 }}>
@@ -202,6 +243,30 @@ export default function MapView({
             </Popup>
           </Marker>
         )}
+
+        {/* TCA / tramos peligrosos – orange dots */}
+        {tcaSites?.map((site, idx) => (
+          <CircleMarker
+            key={`tca-${idx}`}
+            center={[site.lat, site.lon]}
+            radius={5}
+            pathOptions={{ color: '#f97316', fillColor: '#fb923c', fillOpacity: 0.7, weight: 1.5 }}
+          />
+        ))}
+
+        {/* Radar markers */}
+        {showRadares && radares?.map((radar, idx) => (
+          <Marker
+            key={`radar-${idx}`}
+            position={[radar.lat, radar.lon]}
+            icon={radarIcon}
+            zIndexOffset={500}
+          >
+            <Popup>
+              <RadarPopup radar={radar} />
+            </Popup>
+          </Marker>
+        ))}
 
         {/* Station markers */}
         {stations.map((station, idx) => {
