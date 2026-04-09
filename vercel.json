@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "gasolineras-esp.vercel.app"
+        }
+      ],
+      "destination": "https://gasobarato.es/$1",
+      "permanent": true
+    }
+  ]
+}
