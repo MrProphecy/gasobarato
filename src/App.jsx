@@ -129,6 +129,67 @@ function SpotifyWidget() {
   )
 }
 
+// ── Amazon affiliate products ─────────────────────────────────────────────────
+const AFFILIATE_PRODUCTS = [
+  {
+    emoji: '🚨',
+    name: 'Baliza V16 Homologada DGT 2026',
+    desc: 'Obligatoria por ley. Geolocalización GPS incluida.',
+    price: '23,90€',
+    url: 'https://www.amazon.es/dp/B0G61GFSP1?tag=mrprophecy-21',
+  },
+  {
+    emoji: '🔧',
+    name: 'Compresor Aire Portátil 150PSI',
+    desc: 'Infla ruedas en segundos. Batería 6000mAh.',
+    price: '26,99€',
+    url: 'https://www.amazon.es/dp/B0FJY358WX?tag=mrprophecy-21',
+  },
+  {
+    emoji: '⚡',
+    name: 'Arrancador Batería Portátil 8000A',
+    desc: 'Arranca tu coche sin ayuda. Motor hasta 9L.',
+    price: '46,99€',
+    url: 'https://www.amazon.es/dp/B0G3PDHPYL?tag=mrprophecy-21',
+  },
+]
+
+function AffiliateProducts() {
+  return (
+    <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 shadow-xl">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-base">🛒</span>
+        <h2 className="text-sm font-semibold text-slate-200">Productos recomendados para tu viaje</h2>
+        <span className="ml-auto text-[10px] text-slate-500 px-2 py-0.5 bg-slate-700 rounded-md">Amazon</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {AFFILIATE_PRODUCTS.map((p) => (
+          <div
+            key={p.url}
+            className="flex flex-col gap-2 bg-slate-900/60 border border-slate-700/80 rounded-xl p-4 hover:border-slate-600 transition-colors"
+          >
+            <span className="text-3xl leading-none">{p.emoji}</span>
+            <p className="text-sm font-semibold text-slate-100 leading-snug">{p.name}</p>
+            <p className="text-xs text-slate-400 leading-snug flex-1">{p.desc}</p>
+            <p className="text-base font-bold text-emerald-400">~{p.price}</p>
+            <a
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="mt-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors"
+            >
+              Ver en Amazon ↗
+            </a>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-600 mt-3 text-center">
+        Enlaces de afiliado Amazon · El precio puede variar
+      </p>
+    </div>
+  )
+}
+
 // ── TradingView Brent widget ──────────────────────────────────────────────────
 function TradingViewWidget() {
   const containerRef = useRef(null)
@@ -558,6 +619,9 @@ export default function App() {
 
         {/* ── Spotify widget ── */}
         <SpotifyWidget />
+
+        {/* ── Productos afiliado Amazon ── */}
+        <AffiliateProducts />
 
         {/* ── TradingView Brent widget ── */}
         <TradingViewWidget />
